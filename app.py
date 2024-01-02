@@ -1,15 +1,17 @@
 import streamlit as st
 import requests
+import pandas as pd
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 # MediaStack API key
 API_KEY = "371a1750c4791037ce0a4d98b7bfd6b9"
 
 # Function to fetch business and finance news for sentiment analysis
-def get_business_finance_news():
+def get_business_finance_news(stock_symbol):
     base_url = "http://api.mediastack.com/v1/news"
     params = {
         "access_key": API_KEY,
+        "keywords": stock_symbol,
         "categories": "business",
         "countries": "in",
         "languages": "en",
@@ -27,27 +29,47 @@ def analyze_sentiment(text):
 
 # Streamlit app
 def main():
-    st.title("Indian Business and Finance News Sentiment Analysis App")
+    st.title("Stock News Sentiment Analysis App")
+
+    # User input for multiple stock symbols
+    stock_symbols = st.text_input("Enter Stock Symbols (comma-separated):", "AAPL,GOOGL,MSFT").split(',')
 
     if st.button("Get News"):
-        # Fetch business and finance news
-        news_data = get_business_finance_news()
+        # Display table header
+        st.subheader("Stock News Sentiment Analysis")
 
-        if not news_data:
-            st.warning("No business and finance news articles found.")
-        else:
-            # Display news articles and sentiment scores
-            st.subheader("Latest Business and Finance News Articles:")
-            for news in news_data:
-                st.write(f"**Title:** {news['title']}")
-                st.write(f"**Source:** {news['source']}")
-                st.write(f"**Published:** {news['published_at']}")
-                st.write(f"**URL:** {news['url']}")
+        # Create a dataframe to store stock and sentiment data
+        stock_sentiments = {"Stock Symbol": [], "Sentiment Score": []}
 
-                # Analyze sentiment and display score
-                sentiment_score = analyze_sentiment(news['title'])
-                st.write(f"**Sentiment Score:** {sentiment_score:.2f}")
-                st.write("----")
+        # Fetch news and analyze sentiment for each stock
+        for stock_symbol in stock_symbols:
+            news_data = get_business_finance_news(stock_symbol)
+
+            if not news_data:
+                st.warning(f"No news articles found for {stock_symbol}.")
+            else:
+                # Analyze sentiment for each article and calculate average score
+                sentiment_scores = [analyze_sentiment(news['title']) for news in news_data]
+                average_sentiment = sum(sentiment_scores) / len(sentiment_scores)
+
+                # Display stock symbol, average sentiment, and individual news articles
+                st.subheader(f"{stock_symbol} - Average Sentiment Score: {average_sentiment:.2f}")
+
+                for i, news in enumerate(news_data):
+                    st.write(f"**Title:** {news['title']}")
+                    st.write(f"**Source:** {news['source']}")
+                    st.write(f"**Published:** {news['published_at']}")
+                    st.write(f"**URL:** {news['url']}")
+                    st.write(f"**Sentiment Score:** {sentiment_scores[i]:.2f}")
+                    st.write("----")
+
+                # Append data to the dataframe
+                stock_sentiments["Stock Symbol"].append(stock_symbol)
+                stock_sentiments["Sentiment Score"].append(average_sentiment)
+
+        # Display table with stock sentiment data
+        sentiment_df = pd.DataFrame(stock_sentiments)
+        st.table(sentiment_df)
 
 if __name__ == "__main__":
     main()
